@@ -1,0 +1,11 @@
+import {createContext,useContext,useEffect,useState} from 'react'; import api from '../services/api'; import toast from 'react-hot-toast';
+const C=createContext();
+export function AppProvider({children}){const [user,setUser]=useState(null),[cart,setCart]=useState({items:[]}),[wishlist,setWishlist]=useState([]),[loading,setLoading]=useState(true);
+useEffect(()=>{(async()=>{try{if(localStorage.getItem('verano_token')){const {data}=await api.get('/auth/me');setUser(data.data);const c=await api.get('/cart');setCart(c.data.data||{items:[]});const w=await api.get('/wishlist');setWishlist(w.data.data||[])}}catch{localStorage.removeItem('verano_token')}finally{setLoading(false)}})()},[]);
+const login=async(form)=>{const r=await api.post('/auth/login',form);localStorage.setItem('verano_token',r.data.token);setUser(r.data.user);const c=await api.get('/cart');setCart(c.data.data||{items:[]});const w=await api.get('/wishlist');setWishlist(w.data.data||[]);toast.success('Welcome back')};
+const register=async(form)=>{const r=await api.post('/auth/register',form);localStorage.setItem('verano_token',r.data.token);setUser(r.data.user);setCart({items:[]});setWishlist([]);toast.success('Account created')};
+const logout=()=>{localStorage.removeItem('verano_token');setUser(null);setCart({items:[]});setWishlist([])};
+const addCart=async(product,quantity=1)=>{if(!user){const old=JSON.parse(localStorage.getItem('verano_guest_cart')||'[]');const i=old.findIndex(x=>x.product._id===product._id);if(i>=0)old[i].quantity+=quantity;else old.push({product,quantity});localStorage.setItem('verano_guest_cart',JSON.stringify(old));setCart({items:old});toast.success('Added to cart');return}const r=await api.post('/cart',{productId:product._id,quantity});setCart(r.data.data);toast.success('Added to cart')};
+const toggleWish=async(p)=>{if(!user){toast('Sign in to save favorites');return}const exists=wishlist.some(x=>x._id===p._id);const r=exists?await api.delete(`/wishlist/${p._id}`):await api.post('/wishlist',{productId:p._id});setWishlist(r.data.data||[]);toast.success(exists?'Removed from wishlist':'Saved to wishlist')};
+return <C.Provider value={{user,setUser,cart,setCart,wishlist,loading,login,register,logout,addCart,toggleWish}}>{children}</C.Provider>}
+export const useApp=()=>useContext(C);
